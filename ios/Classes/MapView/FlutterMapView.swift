@@ -28,7 +28,7 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
         MKMapType.satellite,
         MKMapType.hybrid,
     ]
-    
+        
     let userTrackingModes: Array<MKUserTrackingMode> = [
         MKUserTrackingMode.none,
         MKUserTrackingMode.follow,
@@ -142,8 +142,26 @@ class FlutterMapView: MKMapView, UIGestureRecognizerDelegate {
         }
         
         if let mapType: Int = options["mapType"] as? Int {
-            self.mapType = self.mapTypes[mapType]
+            if #available(iOS 16.0, *) {
+                let elevationStyle: MKMapConfiguration.ElevationStyle = (options["elevationStyle"] as? Int) == 0 ? MKMapConfiguration.ElevationStyle.flat : MKMapConfiguration.ElevationStyle.realistic
+                
+                switch(mapType) {
+                case 0:
+                    self.preferredConfiguration = MKStandardMapConfiguration(elevationStyle: elevationStyle)
+                    break
+                case 1:
+                    self.preferredConfiguration = MKImageryMapConfiguration(elevationStyle: elevationStyle)
+                    break
+                default:
+                    self.preferredConfiguration = MKHybridMapConfiguration(elevationStyle: elevationStyle);
+                    break
+                }
+            } else {
+                self.mapType = self.mapTypes[mapType]
+            }
         }
+        
+        
         
         if let trafficEnabled: Bool = options["trafficEnabled"] as? Bool {
             if #available(iOS 9.0, *) {

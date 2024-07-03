@@ -18,6 +18,7 @@ public class AppleMapController: NSObject, FlutterPlatformView {
     var currentlySelectedAnnotation: String?
     var snapShotOptions: MKMapSnapshotter.Options = MKMapSnapshotter.Options()
     var snapShot: MKMapSnapshotter?
+    var lookAroundScene: MKLookAroundScene?
     
     public init(withFrame frame: CGRect, withRegistrar registrar: FlutterPluginRegistrar, withargs args: Dictionary<String, Any> ,withId id: Int64) {
         self.options = args["options"] as! [String: Any]
@@ -32,12 +33,12 @@ public class AppleMapController: NSObject, FlutterPlatformView {
         mapView.autoresizingMask = [.flexibleHeight, .flexibleWidth]
         
         self.initialCameraPosition = args["initialCameraPosition"]! as! Dictionary<String, Any>
+        print("Initial Camera Position: \(self.initialCameraPosition)")
         
         super.init()
         
         self.mapView.delegate = self
         
-        self.mapView.setCenterCoordinate(initialCameraPosition, animated: false)
         self.setMethodCallHandlers()
         
         if let annotationsToAdd: NSArray = args["annotationsToAdd"] as? NSArray {
@@ -52,6 +53,12 @@ public class AppleMapController: NSObject, FlutterPlatformView {
         if let circlesToAdd: NSArray = args["circlesToAdd"] as? NSArray {
             self.addCircles(circleData: circlesToAdd)
         }
+        
+        print("Setting initial camera position with data: \(self.initialCameraPosition)")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.mapView.setCenterCoordinate(self.initialCameraPosition, animated: false)
+        }
+        
     }
     
     public func view() -> UIView {
@@ -105,6 +112,16 @@ public class AppleMapController: NSObject, FlutterPlatformView {
                     self.takeSnapshot(options: SnapshotOptions.init(options: args), onCompletion: { (snapshot: FlutterStandardTypedData?, error: Error?) -> Void in
                         result(snapshot ?? error)
                     })
+                    break
+                case "map#lookAround":
+                    var selectedCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: args["latitude"] as! CLLocationDegrees, longitude: args["longitude"] as! CLLocationDegrees)
+                    lookAround(selectedCoordinate: selectedCoordinate)
+                    break
+                case "map#isLookAroundAvailable":
+                    var selectedCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: args["latitude"] as! CLLocationDegrees, longitude: args["longitude"] as! CLLocationDegrees)
+                    self.isLookAroundAvailable(selectedCoordinate: selectedCoordinate) { available in
+                                                result(available)
+                                            }
                 default:
                     result(FlutterMethodNotImplemented)
                     break
@@ -150,6 +167,66 @@ public class AppleMapController: NSObject, FlutterPlatformView {
         })
     }
     
+    func lookAround(selectedCoordinate: CLLocationCoordinate2D) {
+        // Create a look around scene request
+        let sceneRequest = MKLookAroundSceneRequest(coordinate: selectedCoordinate)
+        
+        // Fetch the look around scene
+        sceneRequest.getSceneWithCompletionHandler { [weak self] (scene: MKLookAroundScene?, error: Error?) in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching look around scene: \(error)")
+                return
+            }
+            
+            guard let scene = scene else {
+                print("No look around scene available at this location")
+                return
+            }
+            
+            // Store the fetched scene
+            self.lookAroundScene = scene
+            
+            // Create and present a look around view controller
+            let lookAroundVC = MKLookAroundViewController(scene: scene)
+            
+            // Make sure to present the look around view controller on the main thread
+            DispatchQueue.main.async {
+                if let topVC = self.getTopViewController() {
+                    topVC.present(lookAroundVC, animated: true, completion: nil)
+                }
+            }
+        }
+    }
+    
+    func isLookAroundAvailable(selectedCoordinate: CLLocationCoordinate2D, completion: @escaping (Bool) -> Void) {
+            let sceneRequest = MKLookAroundSceneRequest(coordinate: selectedCoordinate)
+            
+            sceneRequest.getSceneWithCompletionHandler { (scene: MKLookAroundScene?, error: Error?) in
+                if let _ = scene {
+                    completion(true)
+                } else {
+                    completion(false)
+                }
+            }
+        }
+
+
+    private func getTopViewController() -> UIViewController? {
+        var topViewController: UIViewController? = nil
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            topViewController = windowScene.windows.first { $0.isKeyWindow }?.rootViewController
+            while let presentedVC = topViewController?.presentedViewController {
+                topViewController = presentedVC
+            }
+        }
+        return topViewController
+    }
+
+
+
+
     private func annotationUpdate(args: Dictionary<String, Any>) -> Void {
         if let annotationsToAdd = args["annotationsToAdd"] as? NSArray {
             if annotationsToAdd.count > 0 {
