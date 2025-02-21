@@ -194,6 +194,7 @@ public class AppleMapController: NSObject, FlutterPlatformView {
             
             // Create and present a look around view controller
             let lookAroundVC = MKLookAroundViewController(scene: scene)
+            lookAroundVC.pointOfInterestFilter = MKPointOfInterestFilter.excludingAll
             
             // Make sure to present the look around view controller on the main thread
             DispatchQueue.main.async {
