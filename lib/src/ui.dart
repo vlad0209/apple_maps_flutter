@@ -27,6 +27,11 @@ enum TrackingMode {
   followWithHeading,
 }
 
+enum ElevationStyle {
+  flat,
+  realistic,
+}
+
 /// Bounds for the map camera target.
 // Used with [AppleMapOptions] to wrap a [LatLngBounds] value. This allows
 // distinguishing between specifying an unbounded target (null `LatLngBounds`)

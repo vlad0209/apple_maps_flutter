@@ -37,7 +37,6 @@ public class AppleMapController: NSObject, FlutterPlatformView {
         
         self.mapView.delegate = self
         
-        self.mapView.setCenterCoordinate(initialCameraPosition, animated: false)
         self.setMethodCallHandlers()
         
         if let annotationsToAdd: NSArray = args["annotationsToAdd"] as? NSArray {
@@ -51,6 +50,10 @@ public class AppleMapController: NSObject, FlutterPlatformView {
         }
         if let circlesToAdd: NSArray = args["circlesToAdd"] as? NSArray {
             self.addCircles(circleData: circlesToAdd)
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.mapView.setCenterCoordinate(self.initialCameraPosition, animated: false)
         }
     }
     
@@ -105,6 +108,23 @@ public class AppleMapController: NSObject, FlutterPlatformView {
                     self.takeSnapshot(options: SnapshotOptions.init(options: args), onCompletion: { (snapshot: FlutterStandardTypedData?, error: Error?) -> Void in
                         result(snapshot ?? error)
                     })
+                    break
+                case "map#lookAround":
+                    var selectedCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: args["latitude"] as! CLLocationDegrees, longitude: args["longitude"] as! CLLocationDegrees)
+                    if #available(iOS 16.0, *) {
+                        lookAround(selectedCoordinate: selectedCoordinate)
+                    }
+                    break
+                case "map#isLookAroundAvailable":
+                    var selectedCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: args["latitude"] as! CLLocationDegrees, longitude: args["longitude"] as! CLLocationDegrees)
+                    if #available(iOS 16.0, *) {
+                        self.isLookAroundAvailable(selectedCoordinate: selectedCoordinate) { available in
+                            result(available)
+                        }
+                    } else {
+                        result(false)
+                    }
+                    break
                 default:
                     result(FlutterMethodNotImplemented)
                     break
@@ -148,6 +168,66 @@ public class AppleMapController: NSObject, FlutterPlatformView {
                 }
             }
         })
+    }
+    
+    @available(iOS 16.0, *)
+    func lookAround(selectedCoordinate: CLLocationCoordinate2D) {
+        // Create a look around scene request
+        let sceneRequest = MKLookAroundSceneRequest(coordinate: selectedCoordinate)
+        
+        // Fetch the look around scene
+        sceneRequest.getSceneWithCompletionHandler { [weak self] (scene: MKLookAroundScene?, error: Error?) in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error fetching look around scene: \(error)")
+                return
+            }
+            
+            guard let scene = scene else {
+                print("No look around scene available at this location")
+                return
+            }
+            
+            // Store the fetched scene
+            let lookAroundScene = scene
+            
+            // Create and present a look around view controller
+            let lookAroundVC = MKLookAroundViewController(scene: scene)
+            
+            // Make sure to present the look around view controller on the main thread
+            DispatchQueue.main.async {
+                if let topVC = self.getTopViewController() {
+                    topVC.present(lookAroundVC, animated: true, completion: nil)
+                }
+            }
+        }
+    }
+        
+    @available(iOS 16.0, *)
+    func isLookAroundAvailable(selectedCoordinate: CLLocationCoordinate2D, completion: @escaping (Bool) -> Void) {
+       let sceneRequest = MKLookAroundSceneRequest(coordinate: selectedCoordinate)
+       sceneRequest.getSceneWithCompletionHandler { (scene: MKLookAroundScene?, error: Error?) in
+                    if let _ = scene {
+                        completion(true)
+                    } else {
+                        completion(false)
+                    }
+        }
+    }
+
+
+    private func getTopViewController() -> UIViewController? {
+            var topViewController: UIViewController? = nil
+            if #available(iOS 13.0, *) {
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                    topViewController = windowScene.windows.first { $0.isKeyWindow }?.rootViewController
+                    while let presentedVC = topViewController?.presentedViewController {
+                        topViewController = presentedVC
+                    }
+                }
+            }
+            return topViewController
     }
     
     private func annotationUpdate(args: Dictionary<String, Any>) -> Void {

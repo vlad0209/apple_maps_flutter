@@ -244,4 +244,18 @@ class AppleMapController {
     return channel.invokeMethod<Uint8List>(
         'map#takeSnapshot', snapshotOptions._toMap());
   }
+
+  Future<void> lookAround(LatLng latLng) async {
+    await channel.invokeMethod<void>('map#lookAround', <String, dynamic>{
+      'latitude': latLng.latitude,
+      'longitude': latLng.longitude
+    });
+  }
+
+  Future<bool?> isLookAroundAvailable(LatLng latLng) async {
+    return channel.invokeMethod<bool>('map#isLookAroundAvailable', <String, dynamic>{
+      'latitude': latLng.latitude,
+      'longitude': latLng.longitude
+    });
+  }
 }
