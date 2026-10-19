@@ -117,7 +117,6 @@ extension AppleMapController: AnnotationDelegate {
 
     func onAnnotationClick(annotation: MKAnnotation) {
         if let flutterAnnotation: FlutterAnnotation = annotation as? FlutterAnnotation {
-            flutterAnnotation.wasDragged = true
             channel.invokeMethod("annotation#onTap", arguments: ["annotationId" : flutterAnnotation.id])
         }
     }
@@ -215,6 +214,7 @@ extension AppleMapController: AnnotationDelegate {
                 oldAnnotation.title = annotation.title
                 oldAnnotation.subtitle = annotation.subtitle
             })
+            oldAnnotation.icon = annotation.icon
             
             // Update the annotation view with the new image
             if let view = self.mapView.view(for: oldAnnotation) {
